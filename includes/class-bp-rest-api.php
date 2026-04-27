@@ -63,7 +63,7 @@ class BP_REST_API {
         $author_id = get_current_user_id();
 
         if ( empty( $files['files'] ) ) {
-            return new \WP_REST_Response( [ 'error' => 'No files uploaded.' ], 400 );
+            return new \WP_REST_Response( [ 'error' => 'No files uploaded. Please select at least one .docx file.' ], 400 );
         }
 
         // Normalise single vs multiple file upload
@@ -71,22 +71,40 @@ class BP_REST_API {
 
         $batch_id   = wp_generate_uuid4();
         $tmp_dir    = wp_upload_dir()['basedir'] . '/blog-publisher-tmp';
-        wp_mkdir_p( $tmp_dir );
+
+        // Check if tmp_dir is writable
+        if ( ! wp_mkdir_p( $tmp_dir ) ) {
+            error_log( '[BlogPublisher] Failed to create temp directory: ' . $tmp_dir );
+            return new \WP_REST_Response( [ 'error' => 'Failed to create upload directory. Check server permissions.' ], 500 );
+        }
 
         global $wpdb;
         $table    = $wpdb->prefix . 'bp_jobs';
         $job_ids  = [];
+        $errors   = [];
 
         foreach ( $file_list as $file ) {
-            if ( $file['error'] !== UPLOAD_ERR_OK ) continue;
+            if ( $file['error'] !== UPLOAD_ERR_OK ) {
+                $error_msg = self::get_upload_error_message( $file['error'] );
+                $errors[] = "File '{$file['name']}': {$error_msg}";
+                error_log( '[BlogPublisher] Upload error for ' . $file['name'] . ': ' . $error_msg );
+                continue;
+            }
 
             $ext = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
-            if ( $ext !== 'docx' ) continue;
+            if ( $ext !== 'docx' ) {
+                $errors[] = "File '{$file['name']}': Not a .docx file (found .{$ext})";
+                continue;
+            }
 
             $safe_name = wp_unique_filename( $tmp_dir, sanitize_file_name( $file['name'] ) );
             $dest      = $tmp_dir . '/' . $safe_name;
 
-            if ( ! move_uploaded_file( $file['tmp_name'], $dest ) ) continue;
+            if ( ! move_uploaded_file( $file['tmp_name'], $dest ) ) {
+                $errors[] = "File '{$file['name']}': Failed to move uploaded file";
+                error_log( '[BlogPublisher] Failed to move uploaded file: ' . $file['tmp_name'] . ' to ' . $dest );
+                continue;
+            }
 
             $wpdb->insert( $table, [
                 'batch_id'  => $batch_id,
@@ -101,7 +119,11 @@ class BP_REST_API {
         }
 
         if ( empty( $job_ids ) ) {
-            return new \WP_REST_Response( [ 'error' => 'No valid .docx files found.' ], 400 );
+            $error_message = 'No valid .docx files found.';
+            if ( ! empty( $errors ) ) {
+                $error_message .= ' Errors: ' . implode( '; ', $errors );
+            }
+            return new \WP_REST_Response( [ 'error' => $error_message ], 400 );
         }
 
         // Kick off cron
@@ -114,6 +136,19 @@ class BP_REST_API {
             'job_ids'  => $job_ids,
             'message'  => count( $job_ids ) . ' file(s) queued.',
         ], 202 );
+    }
+
+    private static function get_upload_error_message( int $error_code ): string {
+        $messages = [
+            UPLOAD_ERR_INI_SIZE   => 'File exceeds upload_max_filesize in php.ini',
+            UPLOAD_ERR_FORM_SIZE  => 'File exceeds MAX_FILE_SIZE form limit',
+            UPLOAD_ERR_PARTIAL    => 'File was only partially uploaded',
+            UPLOAD_ERR_NO_FILE    => 'No file was uploaded',
+            UPLOAD_ERR_NO_TMP_DIR => 'Server missing temporary folder',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+            UPLOAD_ERR_EXTENSION  => 'A PHP extension stopped the file upload',
+        ];
+        return $messages[ $error_code ] ?? 'Unknown upload error (code: ' . $error_code . ')';
     }
 
     public static function get_jobs( \WP_REST_Request $request ): \WP_REST_Response {

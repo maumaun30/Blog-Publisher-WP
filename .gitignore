@@ -1,0 +1,53 @@
+# WordPress plugin distribution
+*.zip
+!blog-publisher.zip
+
+# Dependencies
+vendor/
+node_modules/
+composer.json
+composer.lock
+package.json
+package-lock.json
+
+# Build/dist
+dist/
+build/
+.svnignore
+
+# Logs
+*.log
+debug.log
+phpcs.xml
+
+# Environment & config
+.env
+.env.local
+.env.*.local
+*.local
+wp-config.php
+wp-config-local.php
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Uploads & temp files
+wp-content/uploads/
+wp-content/debug.log
+
+# Database
+*.sql
+*.sqlite
+db.php
+
+# Testing
+.phpunit.result.cache
+phpunit.xml
+tests/
+.phpcs/

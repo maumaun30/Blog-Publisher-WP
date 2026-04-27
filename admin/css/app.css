@@ -268,6 +268,7 @@
 }
 .bp-notice-warning { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; }
 .bp-notice-info    { background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af; }
+.bp-notice-error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
 /* ── Spinner ───────────────────────────────────────── */
 .bp-spinner {
@@ -294,4 +295,69 @@
     background: #2563eb;
     border-radius: 99px;
     transition: width .4s;
+}
+
+/* ── Live log panel ────────────────────────────────── */
+.bp-log-panel {
+    margin-top: 18px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    overflow: hidden;
+}
+.bp-log-title {
+    margin: 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
+}
+.bp-log-list {
+    display: flex;
+    flex-direction: column;
+}
+.bp-log-entry {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+}
+.bp-log-entry:last-child {
+    border-bottom: none;
+}
+.bp-log-entry.log-processing {
+    background: #fffbeb;
+}
+.bp-log-entry.log-done {
+    background: #f0fdf4;
+}
+.bp-log-entry.log-error {
+    background: #fef2f2;
+}
+.bp-log-entry.log-queued {
+    background: #f8fafc;
+}
+.bp-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.bp-log-file {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1e293b;
+}
+.bp-log-status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-weight: 600;
+}
+.bp-log-message {
+    font-size: 12px;
+    color: #475569;
+    font-family: 'Consolas', 'Monaco', monospace;
+    word-break: break-word;
 }

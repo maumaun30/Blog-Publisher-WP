@@ -34,6 +34,7 @@
         batchId: null,
         polling: null,
         uploading: false,
+        uploadError: null,
         settings: { anthropic_key: '', pexels_key: '' },
         settingsSaved: false,
     };
@@ -132,8 +133,9 @@
                     status === 'queued'     ? '⌛ queued'       : '• pending');
                 item.appendChild(badge);
 
-                const msg = el('span', { className: 'bp-file-msg' }, job ? job.message : '');
-                item.appendChild(msg);
+                const msg = job ? job.message : '';
+                const msgEl = el('span', { className: 'bp-file-msg', title: msg }, msg);
+                item.appendChild(msgEl);
 
                 if (job && job.status === 'done' && job.post_url) {
                     const linkWrap = el('span', { className: 'bp-file-link' });
@@ -151,6 +153,34 @@
                 list.appendChild(item);
             });
 
+            // Live log panel for processing jobs
+            const processingJobs = Object.values(state.jobs).filter(j => j.status === 'processing' || j.status === 'queued' || j.status === 'done' || j.status === 'error');
+            if (processingJobs.length > 0) {
+                const logPanel = el('div', { className: 'bp-log-panel' });
+                logPanel.appendChild(el('h4', { className: 'bp-log-title' }, '📋 Processing Log'));
+
+                const logList = el('div', { className: 'bp-log-list' });
+                processingJobs.forEach(job => {
+                    const jobInfo = state.files.find(f => f.id === job._localId);
+                    const fileName = jobInfo ? jobInfo.file.name : 'Unknown file';
+                    const logEntry = el('div', { className: `bp-log-entry log-${job.status}` });
+
+                    const logHeader = el('div', { className: 'bp-log-header' });
+                    logHeader.appendChild(el('span', { className: 'bp-log-file' }, fileName));
+                    logHeader.appendChild(el('span', { className: `bp-log-status status-${job.status}` },
+                        job.status === 'processing' ? '⏳ Processing' :
+                        job.status === 'done' ? '✓ Complete' :
+                        job.status === 'error' ? '✕ Error' : '⌛ Queued'));
+                    logEntry.appendChild(logHeader);
+
+                    logEntry.appendChild(el('div', { className: 'bp-log-message' }, job.message || 'No message'));
+                    logList.appendChild(logEntry);
+                });
+
+                logPanel.appendChild(logList);
+                list.appendChild(logPanel);
+            }
+
             // Progress bar
             const total = state.files.length;
             const done  = Object.values(state.jobs).filter(j => j.status === 'done' || j.status === 'error').length;
@@ -163,6 +193,12 @@
             }
 
             card.appendChild(list);
+        }
+
+        // Upload error display
+        if (state.uploadError) {
+            const errorNotice = el('div', { className: 'bp-notice bp-notice-error' }, '⚠️  ' + state.uploadError);
+            wrap.appendChild(errorNotice);
         }
 
         // Controls
@@ -270,6 +306,7 @@
     async function handleUpload() {
         if (!state.files.length || state.uploading) return;
         state.uploading = true;
+        state.uploadError = null;
         render();
 
         const fd = new FormData();
@@ -278,7 +315,12 @@
 
         try {
             const res = await api('POST', '/upload', fd, true);
-            if (res.error) { alert(res.error); return; }
+            if (res.error) {
+                state.uploadError = res.error;
+                render();
+                state.uploading = false;
+                return;
+            }
 
             state.batchId = res.batch_id;
 
@@ -291,7 +333,8 @@
 
             startPolling();
         } catch (e) {
-            alert('Upload failed: ' + e.message);
+            state.uploadError = 'Upload failed: ' + e.message;
+            render();
         } finally {
             state.uploading = false;
             render();

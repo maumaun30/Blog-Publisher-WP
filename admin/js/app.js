@@ -220,6 +220,7 @@
         // Upload button
         const hasFiles  = state.files.length > 0;
         const allQueued = !state.batchId;
+        const hasQueuedJobs = Object.values(state.jobs).some(j => j.status === 'queued');
         const uploadBtn = el('button', {
             className: 'bp-btn bp-btn-primary',
             disabled: !hasFiles || state.uploading || !allQueued,
@@ -232,6 +233,15 @@
 
         uploadBtn.onclick = handleUpload;
         controls.appendChild(uploadBtn);
+
+        // Process Queue Now button (for stuck queues)
+        if (state.batchId && hasQueuedJobs) {
+            const processBtn = el('button', {
+                className: 'bp-btn bp-btn-secondary',
+            }, '⚡ Process Queue Now');
+            processBtn.onclick = handleProcessQueue;
+            controls.appendChild(processBtn);
+        }
 
         // Clear button
         if (state.files.length > 0 && state.batchId) {
@@ -351,17 +361,34 @@
         try {
             const jobs = await api('GET', `/jobs?batch_id=${state.batchId}`);
             let allDone = true;
+            let hasQueuedJobs = false;
+            let queuedCount = 0;
+
             jobs.forEach(job => {
                 const existing = state.jobs[job.id] || {};
                 state.jobs[job.id] = { ...existing, ...job };
                 if (job.status !== 'done' && job.status !== 'error') allDone = false;
+                if (job.status === 'queued') {
+                    hasQueuedJobs = true;
+                    queuedCount++;
+                }
             });
+
             render();
+
             if (allDone) {
                 clearInterval(state.polling);
                 state.polling = null;
-                // Trigger cron in case WP cron is slow on this host
+                return;
+            }
+
+            // Auto-trigger cron if jobs have been queued for more than 2 poll cycles
+            if (hasQueuedJobs && !state._queuedSince) {
+                state._queuedSince = Date.now();
+            } else if (hasQueuedJobs && state._queuedSince && (Date.now() - state._queuedSince) > 6000) {
+                // Jobs stuck in queued for 6+ seconds, trigger cron
                 api('POST', '/trigger');
+                state._queuedSince = null;
             }
         } catch (e) {
             // Silent — keep polling
@@ -377,6 +404,16 @@
         state.settings._hasKeys = !!(state.settings.anthropic_key && state.settings.pexels_key);
         render();
         setTimeout(() => { state.settingsSaved = false; render(); }, 3000);
+    }
+
+    async function handleProcessQueue() {
+        try {
+            await api('POST', '/trigger');
+            // Refresh job status immediately
+            await pollJobs();
+        } catch (e) {
+            // Silent fail - user can try again
+        }
     }
 
     // ── Bootstrap ────────────────────────────────────────────────────────

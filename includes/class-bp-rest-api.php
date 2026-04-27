@@ -202,7 +202,12 @@ class BP_REST_API {
     }
 
     public static function trigger_processing(): \WP_REST_Response {
+        // Run queue immediately - process jobs right now
         BP_Background_Process::run_queue();
+
+        // Also schedule cron as backup
+        BP_Background_Process::schedule_queue();
+
         return new \WP_REST_Response( [ 'triggered' => true ], 200 );
     }
 

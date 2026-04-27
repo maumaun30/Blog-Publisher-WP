@@ -15,6 +15,9 @@ class BP_Image_Processor {
      * Returns null on failure.
      */
     public static function process( string $raw_bytes ): ?string {
+        // wp_tempnam() lives in wp-admin/includes/file.php — not auto-loaded in cron/REST contexts
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
         // Write to a temp file so WP_Image_Editor can open it
         $tmp_in  = wp_tempnam( 'bp_img_in' );
         $tmp_out = wp_tempnam( 'bp_img_out' ) . '.webp';

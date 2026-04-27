@@ -47,7 +47,8 @@ class BP_Docx_Parser {
             'SimpleXMLElement',
             LIBXML_NOCDATA | LIBXML_NOERROR
         );
-        if ( ! $xml ) return [ 'title' => '', 'sections' => [] ];
+        // Note: cannot use `! $xml` — SimpleXMLElement casts to false when it has only child elements
+        if ( ! ( $xml instanceof \SimpleXMLElement ) ) return [ 'title' => '', 'sections' => [] ];
 
         // Register namespaces
         $ns = $xml->getNamespaces( true );
@@ -58,7 +59,7 @@ class BP_Docx_Parser {
         $current  = null; // [ 'heading' => '', 'html_parts' => [] ]
 
         $body = $xml->children( $w )->body;
-        if ( ! $body ) return [ 'title' => '', 'sections' => [] ];
+        if ( $body === null || $body->count() === 0 ) return [ 'title' => '', 'sections' => [] ];
 
         foreach ( $body->children( $w ) as $node_name => $node ) {
             if ( $node_name !== 'p' ) continue;
@@ -116,8 +117,12 @@ class BP_Docx_Parser {
     }
 
     private static function is_heading( string $style, int $level ): bool {
-        return strcasecmp( $style, "Heading{$level}" ) === 0
-            || strcasecmp( $style, "Heading {$level}" ) === 0;
+        if ( strcasecmp( $style, "Heading{$level}" ) === 0
+            || strcasecmp( $style, "Heading {$level}" ) === 0 ) {
+            return true;
+        }
+        // Word's "Title" style counts as H1 (it's how the built-in Title button stores it)
+        return $level === 1 && strcasecmp( $style, 'Title' ) === 0;
     }
 
     private static function get_plain_text( \SimpleXMLElement $p, string $w ): string {

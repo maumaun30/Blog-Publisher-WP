@@ -3,7 +3,7 @@
  * Plugin Name: Blog Publisher
  * Plugin URI:  https://github.com/maumaun30/blog-publisher-wp
  * Description: Upload .docx blog posts and auto-publish them with AI-sourced images and SEO via Anthropic + Pexels.
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      Mau
  * License:     GPL-2.0+
  * Text Domain: blog-publisher
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'BP_VERSION',     '1.0.1' );
+define( 'BP_VERSION',     '1.0.2' );
 define( 'BP_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'BP_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 define( 'BP_PLUGIN_FILE', __FILE__ );

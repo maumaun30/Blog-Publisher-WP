@@ -19,7 +19,7 @@ class BP_AI {
                 'content-type'      => 'application/json',
             ],
             'body' => wp_json_encode( [
-                'model'      => 'claude-sonnet-4-20250514',
+                'model'      => 'claude-sonnet-4-6',
                 'max_tokens' => $max_tokens,
                 'messages'   => [
                     [ 'role' => 'user', 'content' => $prompt ],
@@ -67,18 +67,45 @@ class BP_AI {
             "- \"meta_title\": SEO-optimized title, max 60 characters\n" .
             "- \"meta_description\": compelling description, max 155 characters\n\n" .
             "Return ONLY valid JSON, no markdown, no explanation.",
-            200
+            400
         );
 
-        if ( ! $result ) return [ 'meta_title' => substr( $title, 0, 60 ), 'meta_description' => '' ];
+        $fallback_desc = trim( preg_replace( '/\s+/', ' ', substr( $excerpt, 0, 155 ) ) );
 
-        $clean = preg_replace( '/```json|```/', '', $result );
-        $data  = json_decode( trim( $clean ), true );
+        if ( ! $result ) {
+            return [ 'meta_title' => substr( $title, 0, 60 ), 'meta_description' => $fallback_desc ];
+        }
+
+        $data = self::extract_json( $result );
+
+        if ( ! is_array( $data ) ) {
+            error_log( '[BlogPublisher] SEO JSON parse failed. Raw response: ' . substr( $result, 0, 500 ) );
+            return [ 'meta_title' => substr( $title, 0, 60 ), 'meta_description' => $fallback_desc ];
+        }
+
+        $meta_desc = trim( (string) ( $data['meta_description'] ?? '' ) );
+        if ( $meta_desc === '' ) $meta_desc = $fallback_desc;
 
         return [
-            'meta_title'        => substr( $data['meta_title']        ?? $title, 0, 60 ),
-            'meta_description'  => substr( $data['meta_description']  ?? '',      0, 155 ),
+            'meta_title'        => substr( trim( (string) ( $data['meta_title'] ?? $title ) ), 0, 60 ),
+            'meta_description'  => substr( $meta_desc, 0, 155 ),
         ];
+    }
+
+    private static function extract_json( string $raw ): ?array {
+        $stripped = preg_replace( '/```(?:json)?|```/i', '', $raw );
+        $stripped = trim( $stripped );
+
+        $data = json_decode( $stripped, true );
+        if ( is_array( $data ) ) return $data;
+
+        // Fall back to grabbing the first {...} block in case the model wrapped it in prose.
+        if ( preg_match( '/\{(?:[^{}]|(?R))*\}/s', $stripped, $m ) ) {
+            $data = json_decode( $m[0], true );
+            if ( is_array( $data ) ) return $data;
+        }
+
+        return null;
     }
 
     public static function featured_query( string $title, string $intro ): string {
